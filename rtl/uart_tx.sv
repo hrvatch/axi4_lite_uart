@@ -86,10 +86,14 @@ module uart_tx #(
     if (!rst_n) begin
       threshold_counter <= '0;
     end else begin
-      if (i_fifo_wr_en && !fifo_rd_en && !o_fifo_full) begin
-        threshold_counter <= threshold_counter + 1'b1;
-      end else if (fifo_rd_en && !i_fifo_wr_en && !fifo_empty) begin
-        threshold_counter <= threshold_counter - 1'b1;
+      if (i_fifo_clear) begin
+        threshold_counter <= '0;
+      end else begin
+        if (i_fifo_wr_en && !fifo_rd_en && !o_fifo_full) begin
+          threshold_counter <= threshold_counter + 1'b1;
+        end else if (fifo_rd_en && !i_fifo_wr_en && !fifo_empty) begin
+          threshold_counter <= threshold_counter - 1'b1;
+        end
       end
     end
   end
@@ -98,7 +102,7 @@ module uart_tx #(
     if (!rst_n) begin
       o_threshold <= 1'b0;
     end else begin
-      o_threshold <= (threshold_counter >= threshold_value);
+      o_threshold <= (threshold_counter <= threshold_value);
     end
   end
 
