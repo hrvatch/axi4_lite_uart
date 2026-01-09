@@ -237,12 +237,13 @@ module uart_axi_lite #(
       s_clear_tx_fifo <= 1'b0;
       // If there is write address and write data in the buffer
       if (valid_write_address && valid_write_data && (!o_axi_bvalid || i_axi_bready)) begin
-        s_axi_bresp <= RESP_OKAY;
         s_axi_bvalid <= 1'b1;
+        s_axi_bresp <= RESP_SLVERR;
         
-        case (c_axi_awaddr[AXI_ADDR_BW_p-1:2])
+        case (c_axi_awaddr[4:2])
           'd1 : begin // INTERRUPT_ENABLE register, RW
             s_interrupt_enable_reg <= c_axi_wdata[11:0];
+            s_axi_bresp <= RESP_OKAY;
           end
           
           'd2 : begin // CONFIG register, RW
@@ -253,21 +254,21 @@ module uart_axi_lite #(
             s_parity <= c_axi_wdata[3];
             s_use_parity <= c_axi_wdata[2];
             s_data_bits <= c_axi_wdata[1:0];
+            s_axi_bresp <= RESP_OKAY;
           end
 
           'd3 : begin // FIFO_CLEAR register, WO
             s_clear_rx_fifo <= c_axi_wdata[1];
             s_clear_tx_fifo <= c_axi_wdata[0];
+            s_axi_bresp <= RESP_OKAY;
           end
 
           'd5 : begin // TX_FIFO, WO
             s_tx_fifo_data <= c_axi_wdata[7:0];
             s_tx_fifo_wr_en <= 1'b1;
+            s_axi_bresp <= RESP_OKAY;
           end
 
-          default: begin
-            s_axi_bresp <= RESP_SLVERR;
-          end
         endcase
       end else if (o_axi_bvalid && i_axi_bready && !(valid_write_address && valid_write_data)) begin
         s_axi_bvalid <= 1'b0;
@@ -338,12 +339,14 @@ module uart_axi_lite #(
      
       // Generate response when address is available (buffer or direct)
       if ((s_araddr_buf_used || (i_axi_arvalid && o_axi_arready)) && (!o_axi_rvalid || i_axi_rready)) begin
-        s_axi_rresp <= RESP_OKAY;
+        s_axi_rresp <= RESP_SLVERR;
         s_axi_rvalid <= 1'b1;
         s_axi_rdata <= '0;
 
-        case (c_axi_araddr[AXI_ADDR_BW_p-1:2])
+        case (c_axi_araddr[5:2])
           'd0 : begin
+            s_axi_rdata <= '0;
+            s_axi_rresp <= RESP_OKAY;
             s_parity_error_clear <= 1'b1;
             s_frame_error_clear <= 1'b1;
             s_overflow_error_clear <= 1'b1;
@@ -353,10 +356,14 @@ module uart_axi_lite #(
           end
 
           'd1 : begin
+            s_axi_rdata <= '0;
+            s_axi_rresp <= RESP_OKAY;
             s_axi_rdata <= s_interrupt_enable_reg;
           end
 
           'd2 : begin
+            s_axi_rdata <= '0;
+            s_axi_rresp <= RESP_OKAY;
             s_axi_rdata[14:12] <= s_tx_threshold_value;
             s_axi_rdata[11:9] <= s_rx_threshold_value;
             s_axi_rdata[7:5] <= s_baud_rate;
@@ -367,15 +374,13 @@ module uart_axi_lite #(
           end
 
           'd4 : begin
+            s_axi_rdata <= '0;
+            s_axi_rresp <= RESP_OKAY;
             // We can do this because we're using FWFT FIFO
             s_axi_rdata <= i_rx_fifo_data;
             s_rx_fifo_rd_en <= 1'b1;
           end
           
-          default: begin
-            s_axi_rdata <= 32'hdeaddead;
-            s_axi_rresp <= RESP_SLVERR;
-          end
         endcase
       // Clear response when handshake completes and no new transaction
       end else if (o_axi_rvalid && i_axi_rready && !s_araddr_buf_used && !(i_axi_arvalid && o_axi_arready)) begin

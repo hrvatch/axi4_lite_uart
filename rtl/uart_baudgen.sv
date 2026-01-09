@@ -23,51 +23,61 @@ module uart_baudgen #(
   logic [$clog2(DIVIDER_9600)-1:0] tx_counter;
   logic [$clog2(DIVIDER_9600)-1:0] target_value;
 
-  always_comb begin
-    case (i_baud_rate)
-      3'b000 : target_value = DIVIDER_9600;
-      3'b001 : target_value = DIVIDER_19200;
-      3'b010 : target_value = DIVIDER_38400;
-      3'b011 : target_value = DIVIDER_57600;
-      3'b100 : target_value = DIVIDER_115200;
-      3'b101 : target_value = DIVIDER_230400;
-      3'b110 : target_value = DIVIDER_460800;
-      3'b111 : target_value = DIVIDER_921600;
-      default: target_value = DIVIDER_9600;
-    endcase
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      target_value <= DIVIDER_9600;
+    end else begin
+      case (i_baud_rate)
+        3'b000 : target_value <= DIVIDER_9600;
+        3'b001 : target_value <= DIVIDER_19200;
+        3'b010 : target_value <= DIVIDER_38400;
+        3'b011 : target_value <= DIVIDER_57600;
+        3'b100 : target_value <= DIVIDER_115200;
+        3'b101 : target_value <= DIVIDER_230400;
+        3'b110 : target_value <= DIVIDER_460800;
+        3'b111 : target_value <= DIVIDER_921600;
+        default: target_value <= DIVIDER_9600;
+      endcase
+    end
   end
 
   // RX baud generator. We want to generate the strobe in the middle of the bit
-  assign o_rx_strb = (rx_counter == { 1'b0, target_value[$clog2(DIVIDER_9600)-1:1] });
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      rx_counter <= '0;
+      rx_counter <= DIVIDER_9600;
+      o_rx_strb <= 1'b0;
     end else begin
+      o_rx_strb <= 1'b0;
       if (!i_rx_strb_en) begin
-        rx_counter <= '0;
+        rx_counter <= target_value;
       end else begin
-        if (rx_counter == target_value) begin
-          rx_counter <= '0;
+        if (rx_counter == '0) begin
+          rx_counter <= target_value;
+        end else if (rx_counter == { 1'b0, target_value[$clog2(DIVIDER_9600)-1:1] } ) begin
+          rx_counter <= rx_counter - 1'b1;
+          o_rx_strb <= 1'b1;
         end else begin
-          rx_counter <= rx_counter + 1;
+          rx_counter <= rx_counter - 1'b1;
         end
       end
     end
   end
 
   // TX baud generator
-  assign o_tx_strb = (tx_counter == target_value );
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      tx_counter <= '0;
+      tx_counter <= DIVIDER_9600;
+      o_tx_strb <= 1'b0;
     end else begin
+      o_tx_strb <= 1'b0;
       if (!i_tx_strb_en) begin
-        tx_counter <= '0;
+        tx_counter <= target_value;
       end else begin
-        if (tx_counter == target_value) begin
-          tx_counter <= '0;
+        if (tx_counter == '0) begin
+          tx_counter <= target_value;
+          o_tx_strb <= 1'b1;
         end else begin
-          tx_counter <= tx_counter + 1;
+          tx_counter <= tx_counter - 1'b1;
         end
       end
     end
