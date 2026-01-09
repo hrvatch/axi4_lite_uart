@@ -1,0 +1,154 @@
+module uart_top #(
+  parameter int unsigned CLK_FREQ_p        = 100_000_000,
+  parameter int unsigned UART_FIFO_DEPTH_p = 16,
+  parameter int unsigned AXI_ADDR_BW_p     = 12
+) (
+  // Clock and reset
+  input logic                     clk,
+  input logic                     rst_n,
+  // AXI4-Lite (Write strobes are not used, it's assumed they're all asserted)
+  input logic [AXI_ADDR_BW_p-1:0] i_axi_awaddr,
+  input logic                     i_axi_awvalid,
+  input logic [31:0]              i_axi_wdata,
+  input logic                     i_axi_wvalid,
+  input logic                     i_axi_bready,
+  input logic [AXI_ADDR_BW_p-1:0] i_axi_araddr,
+  input logic                     i_axi_arvalid,
+  input logic                     i_axi_rready,
+  output logic                    o_axi_awready,
+  output logic                    o_axi_wready,
+  output logic [1:0]              o_axi_bresp,
+  output logic                    o_axi_bvalid,
+  output logic                    o_axi_arready,
+  output logic [31:0]             o_axi_rdata,
+  output logic [1:0]              o_axi_rresp,
+  output logic                    o_axi_rvalid,
+  // UART signals
+  input  logic                    i_uart_rx,
+  output logic                    o_uart_tx
+);
+
+  // Inputs/outputs from RX/TX
+  logic       s_rx_parity_error;
+  logic       s_rx_frame_error;
+  logic       s_rx_overflow_error;
+  logic       s_rx_underflow_error;
+  logic       s_tx_overflow_error;
+  logic       s_rx_fifo_empty;
+  logic       s_rx_fifo_full;
+  logic       s_tx_fifo_full;
+  logic       s_tx_fifo_empty;
+  logic [7:0] s_rx_fifo_data;
+  logic       s_rx_fifo_rd_en;
+  logic       s_tx_fifo_wr_en;
+  logic [7:0] s_tx_fifo_data;
+  // UART configuration
+  logic       s_clr_tx_fifo;
+  logic       s_clr_rx_fifo;
+  logic [2:0] s_baud_rate;
+  logic [1:0] s_data_bits;
+  logic       s_parity;
+  logic       s_stop_bits;
+  // Baudgen signals
+  logic       s_rx_strb_en; 
+  logic       s_tx_strb_en;
+  logic       s_tx_strb; 
+  logic       s_rx_strb;
+
+  uart_tx #(
+    .FIFO_DEPTH       ( UART_FIFO_DEPTH_p )
+  ) uart_tx_inst (
+    .clk              ( clk                 ),
+    .rst_n            ( rst_n               ),
+    .i_parity         ( s_parity            ),
+    .i_data_bits      ( s_data_bits         ),
+    .i_stop_bits      ( s_stop_bits         ),
+    .i_fifo_wr_en     ( s_tx_fifo_wr_en     ),
+    .i_fifo_wr_data   ( s_tx_fifo_data      ),
+    .i_fifo_clear     ( s_clr_tx_fifo       ),
+    .o_fifo_full      ( s_tx_fifo_full      ),
+    .o_fifo_empty     ( s_tx_fifo_empty     ),
+    .o_overflow_error ( s_tx_overflow_error ),
+    .i_tx_strb        ( s_tx_strb           ),
+    .o_tx_strb_en     ( s_tx_strb_en        ),
+    .o_uart_tx        ( o_uart_tx           )
+  );
+
+  uart_rx #(
+    .FIFO_DEPTH        ( UART_FIFO_DEPTH_p   )
+  ) uart_rx_inst (
+    .clk               ( clk                 ),
+    .rst_n             ( rst_n               ),
+    .i_parity          ( s_parity            ),
+    .i_data_bits       ( s_data_bits         ),
+    .i_stop_bits       ( s_stop_bits         ),
+    .i_fifo_clear      ( s_clr_rx_fifo       ),
+    .i_fifo_rd_en      ( s_rx_fifo_rd_en     ),
+    .o_fifo_rd_data    ( s_rx_fifo_data      ),
+    .o_fifo_full       ( s_rx_fifo_full      ),
+    .o_fifo_empty      ( s_rx_fifo_empty     ),
+    .i_rx_strb         ( s_rx_strb           ),
+    .o_rx_strb_en      ( s_rx_strb_en        ),
+    .i_uart_rx         ( i_uart_rx           ),
+    .o_parity_error    ( s_rx_parity_error   ),
+    .o_frame_error     ( s_rx_frame_error    ),
+    .o_overflow_error  ( s_rx_overflow_error ),
+    .o_underflow_error ( s_tx_underflow_error)
+  );
+
+  uart_baudgen #(
+    .CLK_FREQ       ( CLK_FREQ_p   )
+  ) uart_baudgen_inst (
+    .clk            ( clk          ),
+    .rst_n          ( rst_n        ),   
+    .i_rx_strb_en   ( s_rx_strb_en ),
+    .i_tx_strb_en   ( s_tx_strb_en ),
+    .i_baud_rate    ( s_baud_rate  ),
+    .o_tx_strb      ( s_tx_strb    ),
+    .o_rx_strb      ( s_rx_strb    )
+  );
+
+  uart_axi_lite #(
+    .AXI_ADDR_BW_p        ( AXI_ADDR_BW_p        )
+  ) uart_axi_lite_inst (
+    .clk                  ( clk                  ),
+    .rst_n                ( rst_n                ),
+    .i_axi_awaddr         ( i_axi_awaddr         ),
+    .i_axi_awvalid        ( i_axi_awvalid        ),
+    .i_axi_wdata          ( i_axi_wdata          ),
+    .i_axi_wvalid         ( i_axi_wvalid         ),
+    .i_axi_bready         ( i_axi_bready         ),
+    .i_axi_araddr         ( i_axi_araddr         ),
+    .i_axi_arvalid        ( i_axi_arvalid        ),
+    .i_axi_rready         ( i_axi_rready         ),
+    .o_axi_awready        ( o_axi_awready        ),
+    .o_axi_wready         ( o_axi_wready         ),
+    .o_axi_bresp          ( o_axi_bresp          ),
+    .o_axi_bvalid         ( o_axi_bvalid         ),
+    .o_axi_arready        ( o_axi_arready        ),
+    .o_axi_rdata          ( o_axi_rdata          ),
+    .o_axi_rresp          ( o_axi_rresp          ),
+    .o_axi_rvalid         ( o_axi_rvalid         ),
+    .i_rx_parity_error    ( s_rx_parity_error    ),
+    .i_rx_frame_error     ( s_rx_frame_error     ),
+    .i_rx_overflow_error  ( s_rx_overflow_error  ),
+    .i_rx_underflow_error ( s_rx_underflow_error ),
+    .i_tx_overflow_error  ( s_tx_overflow_error  ),
+    .i_rx_fifo_empty      ( s_rx_fifo_empty      ),
+    .i_rx_fifo_full       ( s_rx_fifo_full       ),
+    .i_tx_fifo_full       ( s_tx_fifo_full       ),
+    .i_tx_fifo_empty      ( s_tx_fifo_empty      ),
+    .i_rx_fifo_data       ( s_rx_fifo_data       ),
+    .o_rx_fifo_rd_en      ( s_rx_fifo_rd_en      ),
+    .o_tx_fifo_wr_en      ( s_tx_fifo_wr_en      ),
+    .o_tx_fifo_data       ( s_tx_fifo_data       ),
+    .o_clr_tx_fifo        ( s_clr_tx_fifo        ),
+    .o_clr_rx_fifo        ( s_clr_rx_fifo        ),
+    .o_baud_rate          ( s_baud_rate          ),
+    .o_data_bits          ( s_data_bits          ),
+    .o_parity             ( s_parity             ),
+    .o_stop_bits          ( s_stop_bits          ),
+    .o_irq                ( o_irq                )
+  );
+
+endmodule : uart_top

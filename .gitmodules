@@ -1,0 +1,3 @@
+[submodule "submodules/common_blocks"]
+	path = submodules/common_blocks
+	url = https://github.com/hrvatch/common_blocks.git
