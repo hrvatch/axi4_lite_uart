@@ -139,17 +139,19 @@ Individual interrupt fields:
 
 ### 0x8: CONFIG register
 
-| Bit range | Short description       |
-|-----------|-------------------------|
-| [31:13]   | Reserved                |
-| [12:10]   | TX FIFO threshold value |
-| [9:7]     | RX FIFO threshold value |
-| [6:4]     | Baud rate               |
-| [3:3]     | Stop bits               |
-| [2:2]     | Parity                  |
-| [1:0]     | Data bits               |
+| Bit range | Short description       | Default value |
+|-----------|-------------------------|---------------|
+| [31:14]   | Reserved                | N/A           |
+| [14:12]   | TX FIFO threshold value | 0x0           |
+| [11:9]    | RX FIFO threshold value | 0x7           |
+| [8:8]     | Reserved                | N/A           |
+| [7:5]     | Baud rate               | 0x4           |
+| [4:4]     | Stop bits               | 0x0           |
+| [3:3]     | Parity                  | 0x0           |
+| [2:2]     | Use parity              | 0x0           |
+| [1:0]     | Data bits               | 0x3           |
 
-Default value after reset: 0x3C3 => TX FIFO threshold of 1 (TX FIFO almost empty), 
+Default value after reset: 0xE83 => TX FIFO threshold of 1 (TX FIFO almost empty), 
 RX FIFO threshold of 15 (RX FIFO almost full), Baud rate = 115200, 8 data bits, parity=None, 
 1 stop bit
 
@@ -193,6 +195,10 @@ Stop bits:
 1 = 2 stop bits
 
 Parity:
+0 = Even parity
+1 = Odd parity
+
+Use parity:
 0 = No parity (Default)
 1 = Use parity
 

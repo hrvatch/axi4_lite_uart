@@ -19,9 +19,9 @@ module uart_baudgen #(
   localparam int unsigned DIVIDER_19200 = CLK_FREQ/19200;
   localparam int unsigned DIVIDER_9600 = CLK_FREQ/9600;
 
-  logic [$clog2(DIVIDER_921600)-1:0] rx_counter;
-  logic [$clog2(DIVIDER_921600)-1:0] tx_counter;
-  logic [$clog2(DIVIDER_921600)-1:0] target_value;
+  logic [$clog2(DIVIDER_9600)-1:0] rx_counter;
+  logic [$clog2(DIVIDER_9600)-1:0] tx_counter;
+  logic [$clog2(DIVIDER_9600)-1:0] target_value;
 
   always_comb begin
     case (i_baud_rate)
@@ -38,12 +38,12 @@ module uart_baudgen #(
   end
 
   // RX baud generator. We want to generate the strobe in the middle of the bit
-  assign o_rx_strb = (rx_counter == { 1'b0, target_value[$clog2(DIVIDER_921600)-1:1] });
+  assign o_rx_strb = (rx_counter == { 1'b0, target_value[$clog2(DIVIDER_9600)-1:1] });
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       rx_counter <= '0;
     end else begin
-      if (i_rx_strb_en) begin
+      if (!i_rx_strb_en) begin
         rx_counter <= '0;
       end else begin
         if (rx_counter == target_value) begin
@@ -61,7 +61,7 @@ module uart_baudgen #(
     if (!rst_n) begin
       tx_counter <= '0;
     end else begin
-      if (i_tx_strb_en) begin
+      if (!i_tx_strb_en) begin
         tx_counter <= '0;
       end else begin
         if (tx_counter == target_value) begin

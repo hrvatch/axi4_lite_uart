@@ -8,6 +8,7 @@ module uart_rx #(
   input  logic       i_parity,
   input  logic [1:0] i_data_bits,
   input  logic       i_stop_bits,
+  input  logic       i_use_parity,
 
   // Data
   input  logic       i_fifo_clear,
@@ -39,18 +40,18 @@ module uart_rx #(
     RECEIVE_STOP_BIT1   = 'd5
   } rx_state_t;
 
-  rx_state_t current_state;
-  rx_state_t next_state;
+  rx_state_t state;
   
   (* ASYNC_REG = "TRUE" *) logic uart_2ff_sync_stage1;
   (* ASYNC_REG = "TRUE" *) logic uart_2ff_sync_stage2;
   logic [1:0] uart_rx;
   logic start_bit;
-  assign o_rx_strb_sync = start_bit;
 
   logic fifo_full;
   logic fifo_wr_en;
   logic [7:0] fifo_wr_data;
+
+  assign o_fifo_full = fifo_full;
 
   logic [2:0] received_bits;
   logic [2:0] data_bits;
@@ -92,8 +93,7 @@ module uart_rx #(
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      current_state <= RECEIVE_START_BIT;
-      next_state <= RECEIVE_START_BIT;
+      state <= IDLE;
       fifo_wr_data <= '0;
       o_rx_strb_en <= 1'b0;
       received_bits <= '0;
@@ -109,59 +109,61 @@ module uart_rx #(
       o_frame_error <= 1'b0;
       fifo_wr_en <= 1'b0;
 
-      case (current_state)
-        IDLE:
+      case (state)
+        IDLE: begin
+          state <= IDLE;
+          
           if (start_bit) begin
-            next_state <= RECEIVE_START_BIT;
+            state <= RECEIVE_START_BIT;
             received_bits <= '0;
             data_bits <= 3'd4 + { 1'b0, i_data_bits };
-            parity <= i_parity;
+            parity <= i_use_parity;
             stop_bits <= i_stop_bits;
-            calc_parity <= 1'b0;
+            calc_parity <= i_parity;
             o_rx_strb_en <= 1'b1;
             fifo_wr_data <= '0;
           end else begin
-            next_state <= IDLE;
             o_rx_strb_en <= 1'b0;
           end
+        end
 
         RECEIVE_START_BIT : begin
+          state <= RECEIVE_START_BIT;
           if (i_rx_strb) begin
-            next_state <= RECEIVE_DATA_BITS;
-          end else begin
-            next_state <= RECEIVE_START_BIT;
+            state <= RECEIVE_DATA_BITS;
           end
         end
 
         RECEIVE_DATA_BITS: begin
+          state <= RECEIVE_DATA_BITS;
           if (i_rx_strb && received_bits != data_bits) begin
-            next_state <= RECEIVE_DATA_BITS;
-            fifo_wr_data <= { fifo_wr_data[6:0], uart_rx[1] };
+            state <= RECEIVE_DATA_BITS;
+            fifo_wr_data <= { uart_rx[1], fifo_wr_data[7:1] };
             received_bits <= received_bits + 1'b1;
             calc_parity <= calc_parity ^ uart_rx[1];
           end else if (i_rx_strb && received_bits == data_bits) begin
-            fifo_wr_data <= { fifo_wr_data[6:0], uart_rx[1] };
+            fifo_wr_data <= { uart_rx[1], fifo_wr_data[7:1] };
             calc_parity <= calc_parity ^ uart_rx[1];
             if (parity) begin
-              next_state <= RECEIVE_PARITY;
+              state <= RECEIVE_PARITY;
             end else begin
-              next_state <= RECEIVE_STOP_BIT0;
+              state <= RECEIVE_STOP_BIT0;
             end
-          end else begin
-            next_state <= RECEIVE_DATA_BITS;
           end
         end
 
         RECEIVE_PARITY : begin
+          state <= RECEIVE_PARITY;
           if (i_rx_strb) begin
             if (uart_rx[1] != calc_parity) begin
               o_parity_error <= 1'b1;
+              state <= RECEIVE_STOP_BIT0;
             end
-            next_state <= RECEIVE_STOP_BIT0;
           end
         end
 
         RECEIVE_STOP_BIT0 : begin
+          state <= RECEIVE_STOP_BIT0;
           if (i_rx_strb) begin
             if (uart_rx[1] != 1'b1) begin
               o_frame_error <= 1'b1;
@@ -170,12 +172,10 @@ module uart_rx #(
             end
 
             if (stop_bits) begin
-              next_state <= RECEIVE_STOP_BIT1;
+              state <= RECEIVE_STOP_BIT1;
             end else begin
-              next_state <= IDLE;
+              state <= IDLE;
             end
-          end else begin
-            next_state <= RECEIVE_STOP_BIT0;
           end
         end
 
@@ -184,14 +184,14 @@ module uart_rx #(
             if (uart_rx[1] != 1'b1) begin
               o_frame_error <= 1'b1;
             end
-            next_state <= IDLE;
+            state <= IDLE;
           end else begin
-            next_state <= RECEIVE_STOP_BIT1;
+            state <= RECEIVE_STOP_BIT1;
           end
         end
 
         default : begin
-          next_state <= IDLE;
+          state <= IDLE;
         end
       endcase 
     end

@@ -43,6 +43,7 @@ module uart_axi_lite #(
   output logic [2:0] o_baud_rate,
   output logic [1:0] o_data_bits,
   output logic o_parity,
+  output logic o_use_parity,
   output logic o_stop_bits,
 
   // Interrupts
@@ -71,11 +72,11 @@ module uart_axi_lite #(
       s_status_reg[10] <= (s_status_reg[10] | i_rx_parity_error) & !s_parity_error_clear;
       s_status_reg[9] <= (s_status_reg[9] | i_rx_frame_error) & !s_frame_error_clear;
       s_status_reg[8] <= (s_status_reg[8] | i_tx_overflow_error) & !s_tx_overflow_error_clear;
-      s_status_reg[7] <= (s_status_reg[7] | i_rx_underflow_error) & !s_underflow_error_clear;
-      s_status_reg[6] <= (s_status_reg[6] | i_rx_overflow_error) & !s_overflow_error_clear;
-      s_status_reg[5] <= i_tx_fifo_full;
-      s_status_reg[4] <= 1'b0;
-      s_status_reg[3] <= i_tx_fifo_empty;
+      s_status_reg[7] <= i_tx_fifo_full;
+      s_status_reg[6] <= 1'b0;
+      s_status_reg[5] <= i_tx_fifo_empty;
+      s_status_reg[4] <= (s_status_reg[4] | i_rx_underflow_error) & !s_underflow_error_clear;
+      s_status_reg[3] <= (s_status_reg[3] | i_rx_overflow_error) & !s_overflow_error_clear;
       s_status_reg[2] <= i_rx_fifo_full;
       s_status_reg[1] <= 1'b0;
       s_status_reg[0] <= i_rx_fifo_empty;
@@ -102,8 +103,8 @@ module uart_axi_lite #(
   // --------------------------------------------------------------
   logic s_clear_rx_fifo;
   logic s_clear_tx_fifo;
-  assign o_clear_rx_fifo = s_clear_rx_fifo;
-  assign o_clear_tx_fifo = s_clear_tx_fifo;
+  assign o_clr_rx_fifo = s_clear_rx_fifo;
+  assign o_clr_tx_fifo = s_clear_tx_fifo;
   
   // --------------------------------------------------------------
   // UART configuration
@@ -113,12 +114,14 @@ module uart_axi_lite #(
   logic [2:0] s_baud_rate;
   logic       s_stop_bits;
   logic       s_parity;
+  logic       s_use_parity;
   logic [1:0] s_data_bits;
 
-  assign o_baud_rate = s_baud_rate;
-  assign o_stop_bits = s_stop_bits;
-  assign o_parity    = s_parity;
-  assign o_data_bits = s_data_bits;
+  assign o_baud_rate  = s_baud_rate;
+  assign o_stop_bits  = s_stop_bits;
+  assign o_use_parity = s_use_parity;
+  assign o_parity     = s_parity;
+  assign o_data_bits  = s_data_bits;
   
   // --------------------------------------------------------------
   // UART (FIFO) data
@@ -214,39 +217,41 @@ module uart_axi_lite #(
       s_interrupt_enable_reg <= '0;
       s_clear_rx_fifo <= 1'b0;
       s_clear_tx_fifo <= 1'b0;
-      s_tx_threshold_value <= '0;
-      s_rx_threshold_value <= '0;
-      s_baud_rate <= '0;
+      s_tx_threshold_value <= 3'h0;
+      s_rx_threshold_value <= 3'h7;
+      s_baud_rate <= 3'h4;
       s_stop_bits <= 1'b0;
       s_parity <= 1'b0;
-      s_data_bits <= 1'b0;
+      s_data_bits <= 2'h3;
       s_tx_fifo_wr_en <= 1'b0;
+      s_use_parity <= 1'b0;
     end else begin
+      s_tx_fifo_wr_en <= 1'b0;
+      s_clear_rx_fifo <= 1'b0;
+      s_clear_tx_fifo <= 1'b0;
       // If there is write address and write data in the buffer
       if (valid_write_address && valid_write_data && (!o_axi_bvalid || i_axi_bready)) begin
         s_axi_bresp <= RESP_OKAY;
         s_axi_bvalid <= 1'b1;
-        s_tx_fifo_wr_en <= 1'b0;
-        s_clear_rx_fifo <= 1'b0;
-        s_clear_tx_fifo <= 1'b0;
         
         case (c_axi_awaddr[AXI_ADDR_BW_p-1:2])
           'd1 : begin // INTERRUPT_ENABLE register, RW
             s_interrupt_enable_reg <= c_axi_wdata[11:0];
           end
-
-          'd2 : begin // FIFO_CLEAR register, WO
-            s_clear_rx_fifo <= c_axi_wdata[1];
-            s_clear_tx_fifo <= c_axi_wdata[0];
+          
+          'd2 : begin // CONFIG register, RW
+            s_tx_threshold_value <= c_axi_wdata[14:12];
+            s_rx_threshold_value <= c_axi_wdata[11:9];
+            s_baud_rate <= c_axi_wdata[7:5];
+            s_stop_bits <= c_axi_wdata[4];
+            s_parity <= c_axi_wdata[3];
+            s_use_parity <= c_axi_wdata[2];
+            s_data_bits <= c_axi_wdata[1:0];
           end
 
-          'd3 : begin // CONFIG register, RW
-            s_tx_threshold_value <= c_axi_wdata[12:10];
-            s_rx_threshold_value <= c_axi_wdata[9:7];
-            s_baud_rate <= c_axi_wdata[6:4];
-            s_stop_bits <= c_axi_wdata[3];
-            s_parity <= c_axi_wdata[2];
-            s_data_bits <= c_axi_wdata[1:0];
+          'd3 : begin // FIFO_CLEAR register, WO
+            s_clear_rx_fifo <= c_axi_wdata[1];
+            s_clear_tx_fifo <= c_axi_wdata[0];
           end
 
           'd5 : begin // TX_FIFO, WO
@@ -318,17 +323,18 @@ module uart_axi_lite #(
       s_tx_overflow_error_clear <= 1'b0;
       s_underflow_error_clear <= 1'b0;
     end else begin
+      s_parity_error_clear <= 1'b0;
+      s_frame_error_clear <= 1'b0;
+      s_overflow_error_clear <= 1'b0;
+      s_rx_fifo_rd_en <= 1'b0;
+      s_tx_overflow_error_clear <= 1'b0;
+      s_underflow_error_clear <= 1'b0;
+     
       // Generate response when address is available (buffer or direct)
       if ((s_araddr_buf_used || (i_axi_arvalid && o_axi_arready)) && (!o_axi_rvalid || i_axi_rready)) begin
         s_axi_rresp <= RESP_OKAY;
         s_axi_rvalid <= 1'b1;
         s_axi_rdata <= '0;
-        s_parity_error_clear <= 1'b0;
-        s_frame_error_clear <= 1'b0;
-        s_overflow_error_clear <= 1'b0;
-        s_rx_fifo_rd_en <= 1'b0;
-        s_tx_overflow_error_clear <= 1'b0;
-        s_underflow_error_clear <= 1'b0;
 
         case (c_axi_araddr[AXI_ADDR_BW_p-1:2])
           'd0 : begin
@@ -344,12 +350,13 @@ module uart_axi_lite #(
             s_axi_rdata <= s_interrupt_enable_reg;
           end
 
-          'd3 : begin
-            s_axi_rdata[12:10] <= s_tx_threshold_value;
-            s_axi_rdata[9:7] <= s_rx_threshold_value;
-            s_axi_rdata[6:4] <= s_baud_rate;
-            s_axi_rdata[3] <= s_stop_bits;
-            s_axi_rdata[2] <= s_parity;
+          'd2 : begin
+            s_axi_rdata[14:12] <= s_tx_threshold_value;
+            s_axi_rdata[11:9] <= s_rx_threshold_value;
+            s_axi_rdata[7:5] <= s_baud_rate;
+            s_axi_rdata[4] <= s_stop_bits;
+            s_axi_rdata[3] <= s_parity;
+            s_axi_rdata[2] <= s_use_parity;
             s_axi_rdata[1:0] <= s_data_bits;
           end
 

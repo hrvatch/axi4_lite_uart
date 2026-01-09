@@ -25,7 +25,9 @@ module uart_top #(
   output logic                    o_axi_rvalid,
   // UART signals
   input  logic                    i_uart_rx,
-  output logic                    o_uart_tx
+  output logic                    o_uart_tx,
+  // Interrupt
+  output logic                    o_irq
 );
 
   // Inputs/outputs from RX/TX
@@ -48,6 +50,7 @@ module uart_top #(
   logic [2:0] s_baud_rate;
   logic [1:0] s_data_bits;
   logic       s_parity;
+  logic       s_use_parity;
   logic       s_stop_bits;
   // Baudgen signals
   logic       s_rx_strb_en; 
@@ -60,6 +63,7 @@ module uart_top #(
   ) uart_tx_inst (
     .clk              ( clk                 ),
     .rst_n            ( rst_n               ),
+    .i_use_parity     ( s_use_parity        ),
     .i_parity         ( s_parity            ),
     .i_data_bits      ( s_data_bits         ),
     .i_stop_bits      ( s_stop_bits         ),
@@ -79,6 +83,7 @@ module uart_top #(
   ) uart_rx_inst (
     .clk               ( clk                 ),
     .rst_n             ( rst_n               ),
+    .i_use_parity      ( s_use_parity        ),
     .i_parity          ( s_parity            ),
     .i_data_bits       ( s_data_bits         ),
     .i_stop_bits       ( s_stop_bits         ),
@@ -93,7 +98,7 @@ module uart_top #(
     .o_parity_error    ( s_rx_parity_error   ),
     .o_frame_error     ( s_rx_frame_error    ),
     .o_overflow_error  ( s_rx_overflow_error ),
-    .o_underflow_error ( s_tx_underflow_error)
+    .o_underflow_error ( s_rx_underflow_error)
   );
 
   uart_baudgen #(
@@ -147,6 +152,7 @@ module uart_top #(
     .o_baud_rate          ( s_baud_rate          ),
     .o_data_bits          ( s_data_bits          ),
     .o_parity             ( s_parity             ),
+    .o_use_parity         ( s_use_parity         ),
     .o_stop_bits          ( s_stop_bits          ),
     .o_irq                ( o_irq                )
   );

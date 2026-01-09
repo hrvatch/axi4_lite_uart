@@ -8,6 +8,7 @@ module uart_tx #(
   input  logic       i_parity,
   input  logic [1:0] i_data_bits,
   input  logic       i_stop_bits,
+  input  logic       i_use_parity,
 
   // Data
   input  logic       i_fifo_wr_en,
@@ -34,8 +35,7 @@ module uart_tx #(
     SEND_STOP_BIT1   = 'd5
   } tx_state_t;
 
-  tx_state_t current_state;
-  tx_state_t next_state;
+  tx_state_t state;
 
   logic fifo_rd_en;
   logic [7:0] fifo_tx_data;
@@ -62,8 +62,7 @@ module uart_tx #(
   // FSM
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      current_state <= IDLE;
-      next_state <= IDLE;
+      state <= IDLE;
 
       o_uart_tx <= 1'b1;
       fifo_rd_en <= 1'b0;
@@ -73,62 +72,60 @@ module uart_tx #(
       calc_parity <= 1'b0;
       uart_tx_data <= '0;
     end else begin
-      next_state <= current_state;
       o_uart_tx <= 1'b1;
       fifo_rd_en <= 1'b0;
       o_tx_strb_en <= 1'b1;
 
-      case (current_state)
+      case (state)
         IDLE: begin
+          state <= IDLE;
+          
           if (!fifo_empty) begin
-            parity <= i_parity;
+            parity <= i_use_parity;
             data_bits <= i_data_bits;
             stop_bits <= i_stop_bits;
             fifo_rd_en <= 1'b1;
-            uart_tx_data <= fifo_tx_data;
-            next_state <= SEND_START_BIT;
+            state <= SEND_START_BIT;
             data_bits <= 3'd4 + {1'b0, i_data_bits };
             sent_bits <= '0;
-            calc_parity <= 1'b0;
+            calc_parity <= i_parity;
           end else begin
             o_tx_strb_en <= 1'b0;
-            next_state <= IDLE;
           end
         end
 
         SEND_START_BIT : begin
+          state <= SEND_START_BIT;
           o_uart_tx <= 1'b0;
           if (i_tx_strb) begin
-            next_state <= SEND_DATA_BITS;
-          end else begin
-            next_state <= SEND_START_BIT;
+            state <= SEND_DATA_BITS;
+            uart_tx_data <= fifo_tx_data;
           end
         end
 
         SEND_DATA_BITS: begin
           o_uart_tx <= uart_tx_data[0];
+          state <= SEND_DATA_BITS;
           if (i_tx_strb && sent_bits != data_bits) begin
             calc_parity = calc_parity ^ uart_tx_data[0];
             sent_bits <= sent_bits + 1;
             uart_tx_data <= { 1'b0, uart_tx_data[7:1] };
-            next_state <= SEND_DATA_BITS;
+            state <= SEND_DATA_BITS;
           end else if (i_tx_strb && sent_bits == data_bits) begin
             if (parity) begin
-              next_state <= SEND_PARITY;
+              state <= SEND_PARITY;
             end else begin
-              next_state <= SEND_STOP_BIT0;
+              state <= SEND_STOP_BIT0;
             end
-          end else begin
-            next_state <= SEND_DATA_BITS;
           end
         end
 
         SEND_PARITY : begin
           o_uart_tx <= calc_parity;
           if (i_tx_strb) begin
-            next_state <= SEND_STOP_BIT0;
+            state <= SEND_STOP_BIT0;
           end else begin
-            next_state <= SEND_PARITY;
+            state <= SEND_PARITY;
           end
         end
 
@@ -136,26 +133,26 @@ module uart_tx #(
           o_uart_tx <= 1'b1;
           if (i_tx_strb) begin
             if (stop_bits) begin
-              next_state <= SEND_STOP_BIT1;
+              state <= SEND_STOP_BIT1;
             end else begin
-              next_state <= IDLE;
+              state <= IDLE;
             end
           end else begin
-            next_state <= SEND_STOP_BIT0;
+            state <= SEND_STOP_BIT0;
           end
         end
 
         SEND_STOP_BIT1 : begin
           o_uart_tx <= 1'b1;
           if (i_tx_strb) begin
-            next_state <= IDLE;
+            state <= IDLE;
           end else begin
-            next_state <= SEND_STOP_BIT1;
+            state <= SEND_STOP_BIT1;
           end
         end
 
         default: begin
-          next_state <= IDLE;
+          state <= IDLE;
         end
       endcase 
     end
