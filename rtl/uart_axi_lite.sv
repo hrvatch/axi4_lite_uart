@@ -28,8 +28,10 @@ module uart_axi_lite #(
   input logic i_tx_overflow_error,
   input logic i_rx_overflow_error,
   input logic i_rx_underflow_error,
+  input logic i_rx_threshold,
   input logic i_rx_fifo_empty,
   input logic i_rx_fifo_full,
+  input logic i_tx_threshold,
   input logic i_tx_fifo_full,
   input logic i_tx_fifo_empty,
   input logic [7:0] i_rx_fifo_data,
@@ -38,6 +40,8 @@ module uart_axi_lite #(
   output logic [7:0] o_tx_fifo_data,
 
   // UART configuration
+  output logic [2:0] o_rx_threshold_value,
+  output logic [2:0] o_tx_threshold_value,
   output logic o_clr_tx_fifo,
   output logic o_clr_rx_fifo,
   output logic [2:0] o_baud_rate,
@@ -73,12 +77,12 @@ module uart_axi_lite #(
       s_status_reg[9] <= (s_status_reg[9] | i_rx_frame_error) & !s_frame_error_clear;
       s_status_reg[8] <= (s_status_reg[8] | i_tx_overflow_error) & !s_tx_overflow_error_clear;
       s_status_reg[7] <= i_tx_fifo_full;
-      s_status_reg[6] <= 1'b0;
+      s_status_reg[6] <= i_tx_threshold;
       s_status_reg[5] <= i_tx_fifo_empty;
       s_status_reg[4] <= (s_status_reg[4] | i_rx_underflow_error) & !s_underflow_error_clear;
       s_status_reg[3] <= (s_status_reg[3] | i_rx_overflow_error) & !s_overflow_error_clear;
       s_status_reg[2] <= i_rx_fifo_full;
-      s_status_reg[1] <= 1'b0;
+      s_status_reg[1] <= i_rx_threshold;
       s_status_reg[0] <= i_rx_fifo_empty;
     end
   end
@@ -117,6 +121,8 @@ module uart_axi_lite #(
   logic       s_use_parity;
   logic [1:0] s_data_bits;
 
+  assign o_rx_threshold_value = s_rx_threshold_value;
+  assign o_tx_threshold_value = s_tx_threshold_value;
   assign o_baud_rate  = s_baud_rate;
   assign o_stop_bits  = s_stop_bits;
   assign o_use_parity = s_use_parity;

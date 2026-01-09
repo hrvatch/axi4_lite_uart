@@ -9,6 +9,8 @@ module uart_rx #(
   input  logic [1:0] i_data_bits,
   input  logic       i_stop_bits,
   input  logic       i_use_parity,
+  input  logic [2:0] i_threshold_value,
+  output logic       o_threshold,
 
   // Data
   input  logic       i_fifo_clear,
@@ -58,7 +60,10 @@ module uart_rx #(
   logic calc_parity;
   logic parity;
   logic stop_bits;
+  logic [4:0] threshold_counter;
+  logic [4:0] threshold_value;
 
+  // == OVERFLOW AND UNDERFLOW HANDLING ==
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       o_overflow_error <= 1'b0; 
@@ -69,6 +74,7 @@ module uart_rx #(
     end
   end
 
+  // == SAMPLE ASYNC INPUTS ==
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       uart_2ff_sync_stage1 <= 1'b1;
@@ -90,7 +96,47 @@ module uart_rx #(
       end
     end
   end
+ 
+  // == THRESHOLD HANDLING ==
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      threshold_value <= '0;
+    end else begin
+      case (i_threshold_value)
+        3'b000  : threshold_value <= 5'd1;
+        3'b001  : threshold_value <= 5'd2;
+        3'b010  : threshold_value <= 5'd4;
+        3'b011  : threshold_value <= 5'd8;
+        3'b100  : threshold_value <= 5'd10;
+        3'b101  : threshold_value <= 5'd12;
+        3'b110  : threshold_value <= 5'd14;
+        3'b111  : threshold_value <= 5'd15;
+        default : threshold_value <= 5'd1;
+      endcase
+    end
+  end
+  
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      threshold_counter <= '0;
+    end else begin
+      if (fifo_wr_en && !i_fifo_rd_en && !fifo_full) begin
+        threshold_counter <= threshold_counter + 1'b1;
+      end else if (i_fifo_rd_en && !fifo_wr_en && !o_fifo_empty) begin
+        threshold_counter <= threshold_counter - 1'b1;
+      end
+    end
+  end
 
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      o_threshold <= 1'b0;
+    end else begin
+      o_threshold <= (threshold_counter <= threshold_value);
+    end
+  end
+
+  // == TX FSM ==
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       state <= IDLE;

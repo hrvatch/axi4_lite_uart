@@ -52,6 +52,10 @@ module uart_top #(
   logic       s_parity;
   logic       s_use_parity;
   logic       s_stop_bits;
+  logic [2:0] s_rx_threshold_value;
+  logic [2:0] s_tx_threshold_value;
+  logic       s_rx_threshold;
+  logic       s_tx_threshold;
   // Baudgen signals
   logic       s_rx_strb_en; 
   logic       s_tx_strb_en;
@@ -59,41 +63,45 @@ module uart_top #(
   logic       s_rx_strb;
 
   uart_tx #(
-    .FIFO_DEPTH       ( UART_FIFO_DEPTH_p )
+    .FIFO_DEPTH        ( UART_FIFO_DEPTH_p )
   ) uart_tx_inst (
-    .clk              ( clk                 ),
-    .rst_n            ( rst_n               ),
-    .i_use_parity     ( s_use_parity        ),
-    .i_parity         ( s_parity            ),
-    .i_data_bits      ( s_data_bits         ),
-    .i_stop_bits      ( s_stop_bits         ),
-    .i_fifo_wr_en     ( s_tx_fifo_wr_en     ),
-    .i_fifo_wr_data   ( s_tx_fifo_data      ),
-    .i_fifo_clear     ( s_clr_tx_fifo       ),
-    .o_fifo_full      ( s_tx_fifo_full      ),
-    .o_fifo_empty     ( s_tx_fifo_empty     ),
-    .o_overflow_error ( s_tx_overflow_error ),
-    .i_tx_strb        ( s_tx_strb           ),
-    .o_tx_strb_en     ( s_tx_strb_en        ),
-    .o_uart_tx        ( o_uart_tx           )
+    .clk               ( clk                  ),
+    .rst_n             ( rst_n                ),
+    .i_use_parity      ( s_use_parity         ),
+    .i_parity          ( s_parity             ),
+    .i_data_bits       ( s_data_bits          ),
+    .i_stop_bits       ( s_stop_bits          ),
+    .i_fifo_wr_en      ( s_tx_fifo_wr_en      ),
+    .i_fifo_wr_data    ( s_tx_fifo_data       ),
+    .i_fifo_clear      ( s_clr_tx_fifo        ),
+    .i_threshold_value ( s_tx_threshold_value ),
+    .o_fifo_full       ( s_tx_fifo_full       ),
+    .o_fifo_empty      ( s_tx_fifo_empty      ),
+    .o_overflow_error  ( s_tx_overflow_error  ),
+    .o_threshold       ( s_tx_threshold       ),
+    .i_tx_strb         ( s_tx_strb            ),
+    .o_tx_strb_en      ( s_tx_strb_en         ),
+    .o_uart_tx         ( o_uart_tx            )
   );
 
   uart_rx #(
-    .FIFO_DEPTH        ( UART_FIFO_DEPTH_p   )
+    .FIFO_DEPTH        ( UART_FIFO_DEPTH_p    )
   ) uart_rx_inst (
-    .clk               ( clk                 ),
-    .rst_n             ( rst_n               ),
-    .i_use_parity      ( s_use_parity        ),
-    .i_parity          ( s_parity            ),
-    .i_data_bits       ( s_data_bits         ),
-    .i_stop_bits       ( s_stop_bits         ),
-    .i_fifo_clear      ( s_clr_rx_fifo       ),
-    .i_fifo_rd_en      ( s_rx_fifo_rd_en     ),
+    .clk               ( clk                  ),
+    .rst_n             ( rst_n                ),
+    .i_use_parity      ( s_use_parity         ),
+    .i_parity          ( s_parity             ),
+    .i_data_bits       ( s_data_bits          ),
+    .i_stop_bits       ( s_stop_bits          ),
+    .i_fifo_clear      ( s_clr_rx_fifo        ),
+    .i_fifo_rd_en      ( s_rx_fifo_rd_en      ),
+    .i_threshold_value ( s_rx_threshold_value ),
     .o_fifo_rd_data    ( s_rx_fifo_data      ),
     .o_fifo_full       ( s_rx_fifo_full      ),
     .o_fifo_empty      ( s_rx_fifo_empty     ),
     .i_rx_strb         ( s_rx_strb           ),
     .o_rx_strb_en      ( s_rx_strb_en        ),
+    .o_threshold       ( s_rx_threshold      ),
     .i_uart_rx         ( i_uart_rx           ),
     .o_parity_error    ( s_rx_parity_error   ),
     .o_frame_error     ( s_rx_frame_error    ),
@@ -138,11 +146,13 @@ module uart_top #(
     .i_rx_frame_error     ( s_rx_frame_error     ),
     .i_rx_overflow_error  ( s_rx_overflow_error  ),
     .i_rx_underflow_error ( s_rx_underflow_error ),
+    .i_rx_threshold       ( s_rx_threshold       ),
     .i_tx_overflow_error  ( s_tx_overflow_error  ),
     .i_rx_fifo_empty      ( s_rx_fifo_empty      ),
     .i_rx_fifo_full       ( s_rx_fifo_full       ),
     .i_tx_fifo_full       ( s_tx_fifo_full       ),
     .i_tx_fifo_empty      ( s_tx_fifo_empty      ),
+    .i_tx_threshold       ( s_tx_threshold       ),
     .i_rx_fifo_data       ( s_rx_fifo_data       ),
     .o_rx_fifo_rd_en      ( s_rx_fifo_rd_en      ),
     .o_tx_fifo_wr_en      ( s_tx_fifo_wr_en      ),
@@ -154,6 +164,8 @@ module uart_top #(
     .o_parity             ( s_parity             ),
     .o_use_parity         ( s_use_parity         ),
     .o_stop_bits          ( s_stop_bits          ),
+    .o_tx_threshold_value ( s_tx_threshold_value ),
+    .o_rx_threshold_value ( s_rx_threshold_value ),
     .o_irq                ( o_irq                )
   );
 
