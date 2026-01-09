@@ -235,4 +235,4 @@ Read from this register will return a single byte from the RX FIFO.
 | [31:8]    | Reserved                   |
 | [7:0]     | Write byte to the TX FIFO  |
 
-Write to this register will write a single byte to the RX FIFO.
+Write to this register will write a single byte to the TX FIFO.
