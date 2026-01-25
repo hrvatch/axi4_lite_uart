@@ -122,8 +122,8 @@ Indicated that TX FIFO is empty. This condition is cleared when TX FIFO is no lo
 
 | Value     | Description                                      |
 |-----------|--------------------------------------------------|
-| 0x0       | TX FIFO is not empty                             |
-| 0x1       | TX FIFO is empty                                 |
+| 0x0       | FIFO is not empty                                |
+| 0x1       | FIFO is empty                                    |
 
 #### TX FIFO threshold
 
