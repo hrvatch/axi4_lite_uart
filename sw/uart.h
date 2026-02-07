@@ -67,7 +67,7 @@
 #define UART_CFG_USE_PARITY         (1U << 2)
 
 /* Parity type [3] */
-#define UART_CFG_PARITY_ODD         (1U << 3)
+#define UART_CFG_PARITY_EVEN        (1U << 3)
 
 /* Stop bits [4] */
 #define UART_CFG_STOP_2             (1U << 4)

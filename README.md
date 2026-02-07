@@ -252,8 +252,8 @@ Sets the UART baud rate:
 
 | Value | Description               |
 |-------|---------------------------|
-| 0     | Even parity               |
-| 1     | Odd parity                |
+| 0     | Odd parity                |
+| 1     | Even parity               |
 
 #### Use parity
 

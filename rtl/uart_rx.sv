@@ -37,9 +37,10 @@ module uart_rx #(
     IDLE                = 'd0,
     RECEIVE_START_BIT   = 'd1,
     RECEIVE_DATA_BITS   = 'd2,
-    RECEIVE_PARITY      = 'd3,
-    RECEIVE_STOP_BIT0   = 'd4,
-    RECEIVE_STOP_BIT1   = 'd5
+    SHIFT_DATA_BITS     = 'd3,
+    RECEIVE_PARITY      = 'd4,
+    RECEIVE_STOP_BIT0   = 'd5,
+    RECEIVE_STOP_BIT1   = 'd6
   } rx_state_t;
 
   rx_state_t state;
@@ -194,11 +195,23 @@ module uart_rx #(
           end else if (i_rx_strb && received_bits == data_bits) begin
             fifo_wr_data <= { uart_rx[1], fifo_wr_data[7:1] };
             calc_parity <= calc_parity ^ uart_rx[1];
-            if (parity) begin
-              state <= RECEIVE_PARITY;
-            end else begin
-              state <= RECEIVE_STOP_BIT0;
-            end
+            state <= SHIFT_DATA_BITS;
+          end
+        end
+
+        SHIFT_DATA_BITS : begin
+          state <= SHIFT_DATA_BITS;
+          case (data_bits[1:0])
+            2'b00 : fifo_wr_data <= { 3'b000, fifo_wr_data[7:3] };
+            2'b01 : fifo_wr_data <= { 2'b00, fifo_wr_data[7:2] };
+            2'b10 : fifo_wr_data <= { 1'b0, fifo_wr_data[7:1] };
+            2'b11 : fifo_wr_data <= { fifo_wr_data };
+          endcase
+          
+          if (parity) begin
+            state <= RECEIVE_PARITY;
+          end else begin
+            state <= RECEIVE_STOP_BIT0;
           end
         end
 

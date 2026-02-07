@@ -154,7 +154,7 @@ module uart_tx #(
           o_uart_tx <= uart_tx_data[0];
           state <= SEND_DATA_BITS;
           if (i_tx_strb && sent_bits != data_bits) begin
-            calc_parity = calc_parity ^ uart_tx_data[0];
+            calc_parity <= calc_parity ^ uart_tx_data[0];
             sent_bits <= sent_bits + 1;
             uart_tx_data <= { 1'b0, uart_tx_data[7:1] };
             state <= SEND_DATA_BITS;
